@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker Dashboard – Build Tracker</title>
+<style>
+:root{
+  --bg:#eef3f6; --surface:#ffffff; --ink:#14232e; --muted:#5b6b78;
+  --line:#d3dde4; --accent:#0b6fa4; --done:#1f8a5b; --track:#d9e4eb;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0e1a22; --surface:#162630; --ink:#e6eef3; --muted:#93a5b2; --line:#26404f; --accent:#4fb3e8; --done:#4cc790; --track:#22394630;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Segoe UI",system-ui,sans-serif}
+.wrap{max-width:760px;margin:0 auto;padding:20px 16px 80px}
+header.top{position:sticky;top:0;z-index:5;background:var(--bg);padding:16px 0 12px;border-bottom:1px solid var(--line)}
+h1{font-size:1.4rem;margin:0 0 10px;font-weight:700}
+.bar{height:22px;background:var(--track);border-radius:11px;overflow:hidden;border:1px solid var(--line)}
+.fill{height:100%;width:0;background:var(--accent);transition:width .35s ease}
+.fill.complete{background:var(--done)}
+.stats{display:flex;justify-content:space-between;margin-top:6px;font-size:.9rem;color:var(--muted)}
+.stats strong{color:var(--ink);font-size:1.05rem}
+.tools{margin-top:8px;display:flex;gap:8px}
+button{font:inherit;font-size:.85rem;padding:5px 12px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer}
+button:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+section.phase{background:var(--surface);border:1px solid var(--line);border-radius:10px;margin-top:16px;overflow:hidden}
+.phase-head{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.phase-head h2{margin:0;font-size:1.05rem}
+.phase-head small{color:var(--muted);white-space:nowrap}
+.phase-bar{height:4px;background:var(--track)}
+.phase-bar div{height:100%;width:0;background:var(--accent);transition:width .35s ease}
+.phase.done .phase-bar div{background:var(--done)}
+ul{list-style:none;margin:0;padding:6px 0}
+li label{display:flex;gap:12px;align-items:flex-start;padding:8px 16px;cursor:pointer}
+li label:hover{background:var(--bg)}
+input[type=checkbox]{width:20px;height:20px;margin-top:2px;flex:none;accent-color:var(--done);cursor:pointer}
+li.checked span{color:var(--muted);text-decoration:line-through}
+code{background:var(--bg);border:1px solid var(--line);border-radius:4px;padding:0 4px;font-size:.88em}
+.opt{font-size:.75rem;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 6px;margin-left:6px}
+.note{color:var(--muted);font-size:.85rem;margin-top:20px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1>Docker Management Dashboard – Build Tracker</h1>
+    <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="barWrap"><div class="fill" id="fill"></div></div>
+    <div class="stats"><span><strong id="pct">0%</strong> complete</span><span id="count">0 of 0 tasks</span></div>
+    <div class="tools"><button id="reset">Reset all</button></div>
+  </header>
+  <main id="app"></main>
+  <p class="note">Your progress is saved in this browser automatically. Reopen this file any time to continue.</p>
+</div>
+
+<script>
+const PLAN = [
+  {t:"Phase 0: Setup", time:"30 min", tasks:[
+    "Confirm Docker is running (<code>docker ps</code> works)",
+    "Check Node.js 18+ is installed",
+    "Create folders: <code>frontend/</code>, <code>backend/</code>, <code>docker-compose.yml</code>",
+    "Run <code>git init</code> and make the first commit"]},
+  {t:"Phase 1: Backend Foundation", time:"1 hour", tasks:[
+    "In <code>backend/</code>: <code>npm init -y</code> and install <code>express</code>, <code>dockerode</code>, <code>cors</code>",
+    "Create <code>server.js</code> with Express, CORS and JSON parsing",
+    "Connect Dockerode to <code>/var/run/docker.sock</code>",
+    "Add test route <code>GET /containers</code> and check it in browser or Postman",
+    "Split routes into <code>containers.js</code>, <code>volumes.js</code>, <code>networks.js</code>"]},
+  {t:"Phase 2: Backend Features", time:"3–4 hours", tasks:[
+    "Containers: list all (running and stopped)",
+    "Containers: start, stop, restart",
+    "Containers: remove",
+    "Containers: create and run (pull image if missing, parse port like <code>8080:80</code>)",
+    "Volumes: list, create, remove",
+    "Networks: list, create, remove",
+    "Add error handling (try/catch, status codes, clear messages)",
+    "Test every endpoint with Postman or curl"]},
+  {t:"Phase 3: Frontend Foundation", time:"1–2 hours", tasks:[
+    "Create Vite + React app in <code>frontend/</code>",
+    "Install <code>axios</code>, <code>react-router-dom</code> and Tailwind CSS",
+    "Set up routes: Dashboard, Containers, Create Container, Volumes, Networks",
+    "Build shared layout (sidebar or navbar)",
+    "Create <code>api.js</code> with an Axios instance for the backend"]},
+  {t:"Phase 4: Frontend Pages", time:"4–5 hours", tasks:[
+    "Volumes page: table, create form, delete button",
+    "Networks page: table, create form, delete button",
+    "Containers page: table, status badges, start/stop/restart/remove buttons",
+    "Create Container page: image, name, port form, redirect on success",
+    "Dashboard page: counts of containers, volumes, networks",
+    "Add loading states and error messages",
+    "Add confirm dialog before deleting"]},
+  {t:"Phase 5: Dockerize Everything", time:"2 hours", tasks:[
+    "Write backend <code>Dockerfile</code>",
+    "Write frontend <code>Dockerfile</code> (multi-stage build, served by nginx)",
+    "Write <code>docker-compose.yml</code> with both services",
+    "Mount socket in backend: <code>/var/run/docker.sock:/var/run/docker.sock</code>",
+    "Test with <code>docker compose up --build</code>"]},
+  {t:"Phase 6: Polish", time:"1–2 hours", tasks:[
+    "Auto-refresh the container list every few seconds",
+    "Improve styling and make it responsive",
+    "Handle edge cases (port in use, image not found)",
+    "Write README with setup instructions and screenshots",
+    "Final commit and push to GitHub"]},
+  {t:"Phase 7: Advanced Networking <span class='opt'>optional</span>", time:"optional", tasks:[
+    "Inspect a network (subnet, gateway, connected containers)",
+    "Connect a container to a network",
+    "Disconnect a container from a network",
+    "Create a network with custom subnet and gateway",
+    "Show connected containers on each network row"]}
+];
+
+const KEY = "docker-dashboard-tracker-v1";
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY)) || {}; } catch(e) { state = {}; }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e) {} }
+
+const app = document.getElementById("app");
+PLAN.forEach((p, pi) => {
+  const sec = document.createElement("section");
+  sec.className = "phase"; sec.id = "phase" + pi;
+  sec.innerHTML = `<div class="phase-head"><h2>${p.t}</h2><small></small></div><div class="phase-bar"><div></div></div><ul></ul>`;
+  const ul = sec.querySelector("ul");
+  p.tasks.forEach((task, ti) => {
+    const id = pi + "-" + ti;
+    const li = document.createElement("li");
+    li.innerHTML = `<label><input type="checkbox" data-id="${id}"><span>${task}</span></label>`;
+    const cb = li.querySelector("input");
+    cb.checked = !!state[id];
+    li.classList.toggle("checked", cb.checked);
+    cb.addEventListener("change", () => {
+      if (cb.checked) state[id] = true; else delete state[id];
+      li.classList.toggle("checked", cb.checked);
+      save(); update();
+    });
+    ul.appendChild(li);
+  });
+  app.appendChild(sec);
+});
+
+function update(){
+  let total = 0, done = 0;
+  PLAN.forEach((p, pi) => {
+    let d = 0;
+    p.tasks.forEach((_, ti) => { if (state[pi + "-" + ti]) d++; });
+    total += p.tasks.length; done += d;
+    const sec = document.getElementById("phase" + pi);
+    sec.querySelector("small").textContent = `${d}/${p.tasks.length} · ${p.time}`;
+    sec.querySelector(".phase-bar div").style.width = (d / p.tasks.length * 100) + "%";
+    sec.classList.toggle("done", d === p.tasks.length);
+  });
+  const pct = total ? Math.round(done / total * 100) : 0;
+  const fill = document.getElementById("fill");
+  fill.style.width = pct + "%";
+  fill.classList.toggle("complete", pct === 100);
+  document.getElementById("pct").textContent = pct + "%";
+  document.getElementById("count").textContent = `${done} of ${total} tasks`;
+  document.getElementById("barWrap").setAttribute("aria-valuenow", pct);
+}
+
+document.getElementById("reset").addEventListener("click", () => {
+  if (!confirm("Clear all progress?")) return;
+  state = {}; save();
+  document.querySelectorAll("input[type=checkbox]").forEach(cb => { cb.checked = false; cb.closest("li").classList.remove("checked"); });
+  update();
+});
+
+update();
+</script>
+</body>
+</html>
