@@ -1,6 +1,6 @@
 import { Router } from "express";
 import docker from "../docker.js";
-import { respondError } from "../errors.js";
+import { errorText, respondError } from "../errors.js";
 
 const router = Router();
 
@@ -92,6 +92,13 @@ router.delete("/:id", async (req, res) => {
     await docker.getNetwork(req.params.id).remove();
     res.json({ message: "Network removed" });
   } catch (err) {
+    const text = errorText(err);
+    // Docker 29 uses 403 both for built-in networks and for networks that still have containers.
+    if (/active endpoints/i.test(text)) {
+      return res.status(409).json({
+        error: "Network has containers connected. Remove or disconnect them first",
+      });
+    }
     if (err.statusCode === 403) {
       return res
         .status(403)

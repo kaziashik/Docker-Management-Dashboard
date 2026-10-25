@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import docker from "./docker.js";
-import containersRouter from "./routes/containers.js";
+import containersRouter from "./routes/containers/route.js";
 import volumesRouter from "./routes/volumes.js";
 import networksRouter from "./routes/networks.js";
 import { jsonBodyError, respondError } from "./errors.js";
