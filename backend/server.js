@@ -29,6 +29,29 @@ app.get("/docker/info", async (req, res) => {
   }
 });
 
+
+
+// List all containers (running and stopped)
+app.get("/containers", async (req, res) => {
+  try {
+    const containers = await docker.listContainers({ all: true });
+
+    const result = containers.map((c) => ({
+      id: c.Id,
+      shortId: c.Id.slice(0, 12),
+      name: c.Names[0].replace("/", ""),
+      image: c.Image,
+      state: c.State,   // running, exited, created, paused
+      status: c.Status, // "Up 2 hours", "Exited (0) 3 days ago"
+      ports: c.Ports,
+    }));
+
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
 });
