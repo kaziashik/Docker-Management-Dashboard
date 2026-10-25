@@ -1,0 +1,313 @@
+{
+  "info": {
+    "name": "Docker Dashboard API",
+    "description": "Requests for the Docker Management Dashboard backend (http://localhost:5000).\n\nRun List containers, List volumes, or List networks first. Those requests save an id or name into collection variables, and the start, stop, restart, and delete requests use them.\n\nCreate requests also save the new id or name.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000"
+    },
+    {
+      "key": "containerId",
+      "value": ""
+    },
+    {
+      "key": "volumeName",
+      "value": ""
+    },
+    {
+      "key": "networkId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "API status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/",
+            "description": "GET /\n\n200: { \"message\": \"Docker Dashboard API is running\" }"
+          },
+          "response": []
+        },
+        {
+          "name": "Docker info",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/docker/info",
+            "description": "GET /docker/info\n\n200: containers, running, images, version.\n503: Docker is not running, or permission was denied on the Docker socket."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Containers",
+      "item": [
+        {
+          "name": "List containers",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code !== 200) return;",
+                  "const list = pm.response.json();",
+                  "if (Array.isArray(list) && list.length > 0) {",
+                  "    pm.collectionVariables.set('containerId', list[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/containers",
+            "description": "GET /containers\n\nReturns every container, newest first. Saves the first id as {{containerId}}."
+          },
+          "response": []
+        },
+        {
+          "name": "Create container",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code !== 201) return;",
+                  "const body = pm.response.json();",
+                  "if (body.id) pm.collectionVariables.set('containerId', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"image\": \"nginx\",\n  \"name\": \"demo-nginx\",\n  \"port\": \"8080:80\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/containers/create",
+            "description": "POST /containers/create\n\nPulls the image when it is missing, then creates and starts the container. name and port are optional. A single port such as \"80\" is treated as 80:80.\n\n201: created and started. Saves id as {{containerId}}.\n400: image is missing, the name is not a string, or the port is not like 8080:80.\n401: image is private or Docker is not logged in.\n404: image was not found.\n409: that name already exists, or the host port is already in use."
+          },
+          "response": []
+        },
+        {
+          "name": "Start container",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/containers/{{containerId}}/start",
+            "description": "POST /containers/:id/start\n\n200: started, or the container was already running.\n404: container not found."
+          },
+          "response": []
+        },
+        {
+          "name": "Stop container",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/containers/{{containerId}}/stop",
+            "description": "POST /containers/:id/stop\n\n200: stopped, or the container was already stopped.\n404: container not found."
+          },
+          "response": []
+        },
+        {
+          "name": "Restart container",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/containers/{{containerId}}/restart",
+            "description": "POST /containers/:id/restart\n\n200: restarted.\n404: container not found."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove container",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/containers/{{containerId}}",
+            "description": "DELETE /containers/:id\n\nForce-removes the container, including when it is still running.\n\n200: removed.\n404: container not found."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Volumes",
+      "item": [
+        {
+          "name": "List volumes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code !== 200) return;",
+                  "const list = pm.response.json();",
+                  "if (Array.isArray(list) && list.length > 0) {",
+                  "    pm.collectionVariables.set('volumeName', list[0].name);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/volumes",
+            "description": "GET /volumes\n\nReturns every volume, newest first. Saves the first name as {{volumeName}}."
+          },
+          "response": []
+        },
+        {
+          "name": "Create volume",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code !== 201) return;",
+                  "const body = pm.response.json();",
+                  "if (body.name) pm.collectionVariables.set('volumeName', body.name);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"demo-volume\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/volumes/create",
+            "description": "POST /volumes/create\n\nName must be at least 2 characters: letters, digits, _ . - and must start with a letter or digit.\n\n201: created. Saves the name as {{volumeName}}.\n400: name is missing or invalid.\n409: a volume with that name already exists."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove volume",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/volumes/{{volumeName}}",
+            "description": "DELETE /volumes/:name\n\n200: removed.\n404: volume not found.\n409: a container is still using the volume."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Networks",
+      "item": [
+        {
+          "name": "List networks",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code !== 200) return;",
+                  "const list = pm.response.json();",
+                  "if (!Array.isArray(list) || list.length === 0) return;",
+                  "const custom = list.find((network) => network.builtIn === false);",
+                  "pm.collectionVariables.set('networkId', (custom || list[0]).id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/networks",
+            "description": "GET /networks\n\nReturns every network, newest first. Saves a custom network id as {{networkId}}, or the first network when every network is built in."
+          },
+          "response": []
+        },
+        {
+          "name": "Create network",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code !== 201) return;",
+                  "const body = pm.response.json();",
+                  "if (body.id) pm.collectionVariables.set('networkId', body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"demo-net\",\n  \"driver\": \"bridge\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": "{{baseUrl}}/networks/create",
+            "description": "POST /networks/create\n\ndriver is optional and defaults to bridge. Allowed drivers: bridge, host, none.\n\n201: created. Saves id as {{networkId}}.\n400: name is missing or invalid, or the driver is not allowed.\n409: a network with that name already exists."
+          },
+          "response": []
+        },
+        {
+          "name": "Remove network",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/networks/{{networkId}}",
+            "description": "DELETE /networks/:id\n\n200: removed.\n403: the network is built in (bridge, host, or none).\n404: network not found.\n409: containers are still connected to the network."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

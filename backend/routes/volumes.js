@@ -1,11 +1,21 @@
 import { Router } from "express";
 import docker from "../docker.js";
+import { respondError } from "../errors.js";
 
 const router = Router();
 
-const handleError = (res, err) => {
-  res.status(err.statusCode || 500).json({ error: err.message });
-};
+const handleError = (res, err) =>
+  respondError(res, err, {
+    404: "Volume not found",
+    byMessage: [
+      { test: /no such volume/i, status: 404, error: "Volume not found" },
+      {
+        test: /volume is in use/i,
+        status: 409,
+        error: "Volume is in use by a container. Remove that container first",
+      },
+    ],
+  });
 
 // GET /volumes
 router.get("/", async (req, res) => {
@@ -30,7 +40,7 @@ router.get("/", async (req, res) => {
 
 // POST /volumes/create
 router.post("/create", async (req, res) => {
-  const name = req.body.name?.trim();
+  const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
 
   if (!name) {
     return res.status(400).json({ error: "Volume name is required" });

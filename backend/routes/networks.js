@@ -1,14 +1,13 @@
 import { Router } from "express";
 import docker from "../docker.js";
+import { respondError } from "../errors.js";
 
 const router = Router();
 
 const PROTECTED = ["bridge", "host", "none"]; // Docker's built-in networks
 const DRIVERS = ["bridge", "host", "none"];
 
-const handleError = (res, err) => {
-  res.status(err.statusCode || 500).json({ error: err.message });
-};
+const handleError = (res, err) => respondError(res, err);
 
 // GET /networks
 router.get("/", async (req, res) => {
@@ -38,8 +37,14 @@ router.get("/", async (req, res) => {
 
 // POST /networks/create
 router.post("/create", async (req, res) => {
-  const name = req.body.name?.trim();
-  const driver = req.body.driver?.trim() || "bridge";
+  const name = typeof req.body.name === "string" ? req.body.name.trim() : "";
+  const rawDriver = req.body.driver;
+  const driver =
+    rawDriver == null || rawDriver === ""
+      ? "bridge"
+      : typeof rawDriver === "string"
+        ? rawDriver.trim()
+        : "";
 
   if (!name) {
     return res.status(400).json({ error: "Network name is required" });

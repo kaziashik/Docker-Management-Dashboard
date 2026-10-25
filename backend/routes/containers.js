@@ -1,16 +1,17 @@
 import { Router } from "express";
 import docker from "../docker.js";
+import { classifyImageError, errorText, portInUseMessage, respondError } from "../errors.js";
 
 const router = Router();
 
-const handleError = (res, err) => {
-  if (err.statusCode === 304) {
-    return res
-      .status(200)
-      .json({ message: "No change: container is already in that state" });
-  }
-  res.status(err.statusCode || 500).json({ error: err.message });
-};
+const handleError = (res, err) =>
+  respondError(res, err, {
+    304: "No change: container is already in that state",
+    404: "Container not found",
+    byMessage: [
+      { test: /no such container/i, status: 404, error: "Container not found" },
+    ],
+  });
 
 // GET /containers
 router.get("/", async (req, res) => {
@@ -107,7 +108,11 @@ const ensureImage = async (image) => {
 
     const stream = await docker.pull(image);
     await new Promise((resolve, reject) => {
-      docker.modem.followProgress(stream, (e) => (e ? reject(e) : resolve()));
+      docker.modem.followProgress(stream, (pullErr) => {
+        if (!pullErr) return resolve();
+        // Pull progress errors are often a plain string, with no statusCode.
+        reject(pullErr instanceof Error ? pullErr : new Error(errorText(pullErr)));
+      });
     });
   }
 };
@@ -131,22 +136,30 @@ const parsePort = (port) => {
 router.post("/create", async (req, res) => {
   const { image, name, port } = req.body;
 
-  if (!image || !image.trim()) {
+  if (typeof image !== "string" || !image.trim()) {
     return res.status(400).json({ error: "Image name is required" });
   }
 
-  const imageName = withTag(image.trim());
+  const imageInput = image.trim();
+  const imageName = withTag(imageInput);
   const config = { Image: imageName, HostConfig: {} };
 
-  if (name && name.trim()) config.name = name.trim();
+  if (name != null && name !== "") {
+    if (typeof name !== "string" || !name.trim()) {
+      return res.status(400).json({ error: "Container name must be a non-empty string" });
+    }
+    config.name = name.trim();
+  }
 
-  if (port && String(port).trim()) {
+  let hostPort = null;
+  if (port != null && String(port).trim()) {
     const parsed = parsePort(port);
     if (!parsed) {
       return res
         .status(400)
         .json({ error: 'Invalid port. Use the format "8080:80"' });
     }
+    hostPort = parsed.host;
     const key = `${parsed.container}/tcp`;
     config.ExposedPorts = { [key]: {} };
     config.HostConfig.PortBindings = { [key]: [{ HostPort: parsed.host }] };
@@ -167,12 +180,20 @@ router.post("/create", async (req, res) => {
     // Container was created but couldn't start (for example, port already in use)
     if (container) await container.remove({ force: true }).catch(() => {});
 
-    if (err.statusCode === 404) {
-      return res.status(404).json({ error: `Image "${imageName}" not found` });
+    const portError = portInUseMessage(err, hostPort);
+    if (portError) {
+      return res.status(409).json({ error: portError });
     }
-    if (err.statusCode === 409) {
+
+    const imageError = classifyImageError(err, imageInput);
+    if (imageError) {
+      return res.status(imageError.status).json({ error: imageError.error });
+    }
+
+    if (err.statusCode === 409 || /already in use by container/i.test(errorText(err))) {
       return res.status(409).json({ error: "A container with that name already exists" });
     }
+
     handleError(res, err);
   }
 });
