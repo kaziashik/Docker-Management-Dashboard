@@ -66,12 +66,113 @@ router.post("/:id/restart", async (req, res) => {
   }
 });
 
+
+
 // DELETE /containers/:id
 router.delete("/:id", async (req, res) => {
   try {
     await docker.getContainer(req.params.id).remove({ force: true });
     res.json({ message: "Container removed" });
   } catch (err) {
+    handleError(res, err);
+  }
+});
+
+
+
+
+
+
+
+///Containers: create and run (pull image if missing, parse port like 8080:80)
+
+
+
+// Add a tag if the image has none (nginx -> nginx:latest)
+const withTag = (image) => {
+  const lastPart = image.split("/").pop();
+  return lastPart.includes(":") || lastPart.includes("@")
+    ? image
+    : `${image}:latest`;
+};
+
+
+
+// Pull an image only if it isn't already on this machine
+const ensureImage = async (image) => {
+  try {
+    await docker.getImage(image).inspect();
+  } catch (err) {
+    if (err.statusCode !== 404) throw err;
+
+    const stream = await docker.pull(image);
+    await new Promise((resolve, reject) => {
+      docker.modem.followProgress(stream, (e) => (e ? reject(e) : resolve()));
+    });
+  }
+};
+
+
+
+
+// Turn "8080:80" into the format Docker expects
+const parsePort = (port) => {
+  const [hostPort, containerPort] = String(port).trim().split(":");
+  const host = hostPort;
+  const container = containerPort || hostPort; // "80" means 80:80
+
+  const valid = (p) => /^\d+$/.test(p) && +p > 0 && +p <= 65535;
+  if (!valid(host) || !valid(container)) return null;
+
+  return { host, container };
+};
+
+// POST /containers/create
+router.post("/create", async (req, res) => {
+  const { image, name, port } = req.body;
+
+  if (!image || !image.trim()) {
+    return res.status(400).json({ error: "Image name is required" });
+  }
+
+  const imageName = withTag(image.trim());
+  const config = { Image: imageName, HostConfig: {} };
+
+  if (name && name.trim()) config.name = name.trim();
+
+  if (port && String(port).trim()) {
+    const parsed = parsePort(port);
+    if (!parsed) {
+      return res
+        .status(400)
+        .json({ error: 'Invalid port. Use the format "8080:80"' });
+    }
+    const key = `${parsed.container}/tcp`;
+    config.ExposedPorts = { [key]: {} };
+    config.HostConfig.PortBindings = { [key]: [{ HostPort: parsed.host }] };
+  }
+
+  let container;
+  try {
+    await ensureImage(imageName);
+    container = await docker.createContainer(config);
+    await container.start();
+
+    res.status(201).json({
+      message: "Container created and started",
+      id: container.id,
+      shortId: container.id.slice(0, 12),
+    });
+  } catch (err) {
+    // Container was created but couldn't start (for example, port already in use)
+    if (container) await container.remove({ force: true }).catch(() => {});
+
+    if (err.statusCode === 404) {
+      return res.status(404).json({ error: `Image "${imageName}" not found` });
+    }
+    if (err.statusCode === 409) {
+      return res.status(409).json({ error: "A container with that name already exists" });
+    }
     handleError(res, err);
   }
 });
