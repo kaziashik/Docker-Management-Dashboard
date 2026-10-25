@@ -1,6 +1,9 @@
 import express from "express";
 import cors from "cors";
 import docker from "./docker.js";
+import containersRouter from "./routes/containers.js";
+import volumesRouter from "./routes/volumes.js";
+import networksRouter from "./routes/networks.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -9,12 +12,11 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-// Test route
+// Test routes
 app.get("/", (req, res) => {
   res.json({ message: "Docker Dashboard API is running" });
 });
 
-// Docker connection test
 app.get("/docker/info", async (req, res) => {
   try {
     const info = await docker.info();
@@ -29,28 +31,10 @@ app.get("/docker/info", async (req, res) => {
   }
 });
 
-
-
-// List all containers (running and stopped)
-app.get("/containers", async (req, res) => {
-  try {
-    const containers = await docker.listContainers({ all: true });
-
-    const result = containers.map((c) => ({
-      id: c.Id,
-      shortId: c.Id.slice(0, 12),
-      name: c.Names[0].replace("/", ""),
-      image: c.Image,
-      state: c.State,   // running, exited, created, paused
-      status: c.Status, // "Up 2 hours", "Exited (0) 3 days ago"
-      ports: c.Ports,
-    }));
-
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
+// Routes
+app.use("/containers", containersRouter);
+app.use("/volumes", volumesRouter);
+app.use("/networks", networksRouter);
 
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
