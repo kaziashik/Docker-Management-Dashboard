@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
 import Sidebar from './Sidebar'
 
 function Layout() {
@@ -8,6 +9,7 @@ function Layout() {
       <main className="flex-1 p-8">
         <Outlet />
       </main>
+      <Toaster position="top-right" />
     </div>
   )
 }
