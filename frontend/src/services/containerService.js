@@ -24,3 +24,14 @@ export const removeContainer = async (id) => {
   const res = await api.delete(`/containers/${id}`)
   return res.data
 }
+
+
+export const createContainer = async ({ image, name, port }) => {
+  const body = { image }
+  if (name) body.name = name
+  if (port) body.port = port
+
+  // Pulling an image can be slow, so allow up to 5 minutes for this request only
+  const res = await api.post('/containers/create', body, { timeout: 300000 })
+  return res.data
+}
