@@ -1,4 +1,5 @@
 import { Routes, Route } from 'react-router-dom'
+import Layout from '../components/Layout'
 import Dashboard from '../pages/Dashboard'
 import Containers from '../pages/Containers'
 import CreateContainer from '../pages/CreateContainer'
@@ -8,12 +9,14 @@ import Networks from '../pages/Networks'
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Dashboard />} />
-      <Route path="/containers" element={<Containers />} />
-      <Route path="/containers/create" element={<CreateContainer />} />
-      <Route path="/volumes" element={<Volumes />} />
-      <Route path="/networks" element={<Networks />} />
-      <Route path="*" element={<h1 className="text-2xl font-bold">404 - Page not found</h1>} />
+      <Route element={<Layout />}>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/containers" element={<Containers />} />
+        <Route path="/containers/create" element={<CreateContainer />} />
+        <Route path="/volumes" element={<Volumes />} />
+        <Route path="/networks" element={<Networks />} />
+        <Route path="*" element={<h1 className="text-2xl font-bold">404 - Page not found</h1>} />
+      </Route>
     </Routes>
   )
 }
